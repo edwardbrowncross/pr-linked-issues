@@ -1,0 +1,57 @@
+service: pr-linked-issues
+
+provider:
+  name: aws
+  stage: dev
+  runtime: nodejs8.10
+  region: eu-west-2
+  endpointType: regional
+  environment:
+    SSM_APP_CERTIFICATE: pr-linked-issues-${opt:stage, self:provider.stage}-pem
+    SSM_APP_SECRET: pr-linked-issues-${opt:stage, self:provider.stage}-app-secret
+    GITHUB_APP_ID: ${ssm:pr-linked-issues-${opt:stage, self:provider.stage}-app-id}
+    GITHUB_APP_NAME: ${self:custom.${opt:stage, self:provider.stage}.APP_NAME}
+    DOMAIN_NAME: ${self:custom.${opt:stage, self:provider.stage}.DOMAIN_NAME}
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action: 
+        - ssm:GetParameter
+      Resource:
+        - arn:aws:ssm:eu-west-2:369575445310:parameter/pr-linked-issues-${opt:stage, self:provider.stage}-*
+
+functions:
+  home:
+    handler: home.handler
+    events:
+      - http:
+          path: /
+          method: GET
+  auth:
+    handler: auth.handler
+    events:
+      - http:
+          path: auth
+          method: POST
+  webhook:
+    handler: webhook.handler
+    events:
+      - http:
+          path: webhook
+          method: POST
+
+plugins:
+  - serverless-domain-manager
+
+custom:
+  dev:
+    DOMAIN_NAME: pr-linked-issues-dev.vertices.xyz
+    APP_NAME: pr-linked-issues-dev
+  prod:
+    DOMAIN_NAME: pr-linked-issues.vertices.xyz
+    APP_NAME: pr-linked-issues
+  customDomain:
+    domainName: ${self:custom.${opt:stage, self:provider.stage}.DOMAIN_NAME}
+    stage: ${opt:stage, self:provider.stage}
+    certificateName: '*.vertices.xyz'
+    createRoute53Record: true
+    endpointType: regional
